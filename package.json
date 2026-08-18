@@ -1,0 +1,21 @@
+{
+  "name": "codealpha-url-shortener",
+  "version": "1.0.0",
+  "description": "CodeAlpha Backend Development Internship - Task 1: Simple URL Shortener",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["url-shortener", "express", "nodejs", "codealpha"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.19.2",
+    "better-sqlite3": "^11.3.0",
+    "nanoid": "^3.3.7",
+    "valid-url": "^1.0.9",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5"
+  }
+}
