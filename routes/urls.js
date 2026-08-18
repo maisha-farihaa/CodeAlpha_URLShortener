@@ -18,24 +18,6 @@ router.post('/shorten', (req, res) => {
     return res.status(400).json({ error: 'The provided URL is not valid. Make sure it starts with http:// or https://' });
   }
 
-  let shortCode = nanoid(CODE_LENGTH);
-  let attempt = 0;
-  while (db.prepare('SELECT * FROM urls WHERE short_code = ?').get(shortCode)) {
-    shortCode = nanoid(CODE_LENGTH);
-    attempt++;
-    if (attempt > 5) break;
-  }
+  //let shortCode = nanoid(CODE_LENGTH);
+ let shortCode = customCode ? customCode.trim() : nanoid(CODE_LENGTH);
 
-  const insert = db.prepare('INSERT INTO urls (short_code, original_url) VALUES (?, ?)');
-  insert.run(shortCode, url);
-
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
-
-  res.status(201).json({
-    shortCode,
-    shortUrl: `${baseUrl}/${shortCode}`,
-    originalUrl: url
-  });
-});
-
-module.exports = router;
