@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 
-const db = require('./db');
+const { initDb, getDb, saveDb } = require('./db');
 const urlRoutes = require('./routes/urls');
 
 const app = express();
@@ -15,19 +15,27 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/api', urlRoutes);
 
-// redirect short code to original url
+// GET /:code -> redirects to the original long URL
 app.get('/:code', (req, res, next) => {
   const { code } = req.params;
 
   if (code.includes('.')) return next();
 
-  const row = db.prepare('SELECT * FROM urls WHERE short_code = ?').get(code);
+  const db = getDb();
+  const stmt = db.prepare('SELECT * FROM urls WHERE short_code = ?');
+  stmt.bind([code]);
 
-  if (!row) {
+  if (!stmt.step()) {
+    stmt.free();
     return res.status(404).send('Short URL not found.');
   }
 
-  db.prepare('UPDATE urls SET clicks = clicks + 1 WHERE short_code = ?').run(code);
+  const row = stmt.getAsObject();
+  stmt.free();
+
+  db.run('UPDATE urls SET clicks = clicks + 1 WHERE short_code = ?', [code]);
+  saveDb();
+
   res.redirect(row.original_url);
 });
 
@@ -35,6 +43,9 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Route not found.' });
 });
 
-app.listen(PORT, () => {
-  console.log(`URL Shortener server running on http://localhost:${PORT}`);
+// sql.js needs to load its WASM engine first, so we wait for that before listening
+initDb().then(() => {
+  app.listen(PORT, () => {
+    console.log(`URL Shortener server running on http://localhost:${PORT}`);
+  });
 });
