@@ -25,6 +25,55 @@
     </table>
   </div>
 
+<script>
+  const urlInput = document.getElementById('urlInput');
+  const shortenBtn = document.getElementById('shortenBtn');
+  const result = document.getElementById('result');
+  const errorMsg = document.getElementById('errorMsg');
+  const urlTableBody = document.getElementById('urlTableBody');
 
+  async function loadUrls() {
+    const res = await fetch('/api/urls');
+    const data = await res.json();
+    urlTableBody.innerHTML = data.map(row => `
+      <tr>
+        <td><a href="/${row.short_code}" target="_blank">/${row.short_code}</a></td>
+        <td>${row.original_url}</td>
+        <td>${row.clicks}</td>
+      </tr>
+    `).join('');
+  }
+
+  shortenBtn.addEventListener('click', async () => {
+    errorMsg.textContent = '';
+    result.style.display = 'none';
+
+    const url = urlInput.value.trim();
+    if (!url) return;
+
+    try {
+      const res = await fetch('/api/shorten', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url })
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        errorMsg.textContent = data.error || 'Something went wrong.';
+        return;
+      }
+
+      result.style.display = 'block';
+      result.innerHTML = `Short URL: <a href="${data.shortUrl}" target="_blank">${data.shortUrl}</a>`;
+      urlInput.value = '';
+      loadUrls();
+    } catch (err) {
+      errorMsg.textContent = 'Could not reach the server.';
+    }
+  });
+
+  loadUrls();
+</script>
 </body>
 </html>
