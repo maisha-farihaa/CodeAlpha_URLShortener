@@ -21,3 +21,29 @@ router.post('/shorten', (req, res) => {
   //let shortCode = nanoid(CODE_LENGTH);
  let shortCode = customCode ? customCode.trim() : nanoid(CODE_LENGTH);
 
+ if (customCode) {
+    const existing = db.prepare('SELECT * FROM urls WHERE short_code = ?').get(shortCode);
+    if (existing) {
+      return res.status(409).json({ error: 'That custom code is already taken. Please choose another one.' });
+    }
+  }
+
+  let attempt = 0;
+  while (!customCode && db.prepare('SELECT * FROM urls WHERE short_code = ?').get(shortCode)) {
+    shortCode = nanoid(CODE_LENGTH);
+    attempt++;
+    if (attempt > 5) break;
+  }
+
+  const insert = db.prepare('INSERT INTO urls (short_code, original_url) VALUES (?, ?)');
+  insert.run(shortCode, url);
+
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
+
+  res.status(201).json({
+    shortCode,
+    shortUrl: `${baseUrl}/${shortCode}`,
+    originalUrl: url
+  });
+});
+
