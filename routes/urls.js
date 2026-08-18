@@ -2,9 +2,27 @@ const express = require('express');
 const router = express.Router();
 const { nanoid } = require('nanoid');
 const validUrl = require('valid-url');
-const db = require('../db');
+const { getDb, saveDb } = require('../db');
 
 const CODE_LENGTH = 6;
+
+// runs a SELECT query and returns matching rows as plain objects
+function selectAll(sql, params = []) {
+  const db = getDb();
+  const stmt = db.prepare(sql);
+  stmt.bind(params);
+  const rows = [];
+  while (stmt.step()) {
+    rows.push(stmt.getAsObject());
+  }
+  stmt.free();
+  return rows;
+}
+
+function selectOne(sql, params = []) {
+  const rows = selectAll(sql, params);
+  return rows.length > 0 ? rows[0] : null;
+}
 
 // POST /api/shorten
 router.post('/shorten', (req, res) => {
@@ -21,21 +39,22 @@ router.post('/shorten', (req, res) => {
   let shortCode = customCode ? customCode.trim() : nanoid(CODE_LENGTH);
 
   if (customCode) {
-    const existing = db.prepare('SELECT * FROM urls WHERE short_code = ?').get(shortCode);
+    const existing = selectOne('SELECT * FROM urls WHERE short_code = ?', [shortCode]);
     if (existing) {
       return res.status(409).json({ error: 'That custom code is already taken. Please choose another one.' });
     }
   }
 
   let attempt = 0;
-  while (!customCode && db.prepare('SELECT * FROM urls WHERE short_code = ?').get(shortCode)) {
+  while (!customCode && selectOne('SELECT * FROM urls WHERE short_code = ?', [shortCode])) {
     shortCode = nanoid(CODE_LENGTH);
     attempt++;
     if (attempt > 5) break;
   }
 
-  const insert = db.prepare('INSERT INTO urls (short_code, original_url) VALUES (?, ?)');
-  insert.run(shortCode, url);
+  const db = getDb();
+  db.run('INSERT INTO urls (short_code, original_url) VALUES (?, ?)', [shortCode, url]);
+  saveDb();
 
   const baseUrl = `${req.protocol}://${req.get('host')}`;
 
@@ -48,8 +67,10 @@ router.post('/shorten', (req, res) => {
 
 // GET /api/stats/:code
 router.get('/stats/:code', (req, res) => {
-  const { code } = req.params;
-  const row = db.prepare('SELECT short_code, original_url, clicks, created_at FROM urls WHERE short_code = ?').get(code);
+  const row = selectOne(
+    'SELECT short_code, original_url, clicks, created_at FROM urls WHERE short_code = ?',
+    [req.params.code]
+  );
 
   if (!row) {
     return res.status(404).json({ error: 'Short code not found.' });
@@ -60,7 +81,7 @@ router.get('/stats/:code', (req, res) => {
 
 // GET /api/urls
 router.get('/urls', (req, res) => {
-  const rows = db.prepare('SELECT short_code, original_url, clicks, created_at FROM urls ORDER BY created_at DESC').all();
+  const rows = selectAll('SELECT short_code, original_url, clicks, created_at FROM urls ORDER BY created_at DESC');
   res.json(rows);
 });
 
